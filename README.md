@@ -10,7 +10,6 @@ In the root directory of the project, create a file named `.env` with the follow
 ```env
 DB_URL="mysql://root@tcp(127.0.0.1:3306)/livestream?charset=utf8&parseTime=True&loc=UTC"
 AUTH_TOKEN_SIGNING_PEPPER=8yfds34rtyui98uygfdw45yuouy1
-RTMP_SERVER_PASSCODE=3454f56ygfdsertyuio076rseryui76
 CORS_ALLOW_ORIGINS=http://localhost:4200
 ```
 
