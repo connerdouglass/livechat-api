@@ -60,6 +60,11 @@ func (s *LiveChatBufferGroup) PushMessage(streamID uint64, msg *ChatMsg) {
 	s.streamChatBuffersMut.Lock()
 	defer s.streamChatBuffersMut.Unlock()
 
+	// If the buffers map is nil, create it
+	if s.streamChatBuffers == nil {
+		s.streamChatBuffers = map[uint64]*LiveChatMessageBuffer{}
+	}
+
 	// Get the buffer for this stream identifier
 	buf, ok := s.streamChatBuffers[streamID]
 	if !ok {
@@ -79,6 +84,11 @@ func (s *LiveChatBufferGroup) CopyMessages(streamID uint64) []*ChatMsg {
 	// Lock on the buffers
 	s.streamChatBuffersMut.RLock()
 	defer s.streamChatBuffersMut.RUnlock()
+
+	// If the buffers map is nil, return nil
+	if s.streamChatBuffers == nil {
+		return nil
+	}
 
 	// Get the buffer for this stream identifier
 	buf, ok := s.streamChatBuffers[streamID]
