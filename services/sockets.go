@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/godocompany/livechat-api/models"
 	socketio "github.com/googollee/go-socket.io"
 )
 
@@ -17,7 +18,11 @@ type SocketsService struct {
 	TelegramService      *TelegramService
 	ChatService          *ChatService
 	streamChatBuffers    map[uint64]*LiveChatMessageBuffer
-	streamChatBuffersMut sync.Mutex
+	streamChatBuffersMut sync.RWMutex
+}
+
+func socketRoomName(chatRoom *models.ChatRoom) string {
+	return fmt.Sprintf("chatroom_%s", chatRoom.Identifier)
 }
 
 func (s *SocketsService) Setup() {
@@ -71,9 +76,7 @@ func (s *SocketsService) OnChatRoomJoin(conn socketio.Conn, data ChatRoomJoinMsg
 	}
 
 	// Join the room for the event
-	conn.Join(
-		fmt.Sprintf("chatroom_%s", chatRoom.Identifier),
-	)
+	conn.Join(socketRoomName(chatRoom))
 
 	// Emit all the buffered messages to the new viewer, so they don't open the page to
 	// a completely empty live chat screen
@@ -89,15 +92,6 @@ func (s *SocketsService) OnChatRoomJoin(conn socketio.Conn, data ChatRoomJoinMsg
 	conn.Emit("chat.messages", messagesSer)
 
 	fmt.Println("joined stream: ", chatRoom.Identifier, conn.RemoteAddr().String())
-
-	// // Update the viewer count
-	// go s.StreamsService.UpdateViewerCount(
-	// 	chatRoom,
-	// 	s.Server.RoomLen(
-	// 		"/",
-	// 		fmt.Sprintf("chatroom_%s", chatRoom.Identifier),
-	// 	),
-	// )
 
 	return nil
 
@@ -124,18 +118,7 @@ func (s *SocketsService) OnChatRoomLeave(conn socketio.Conn, data ChatRoomLeaveM
 	}
 
 	// Leave the room for the event
-	conn.Leave(
-		fmt.Sprintf("chatroom_%s", chatRoom.Identifier),
-	)
-
-	// // Update the viewer count
-	// go s.StreamsService.UpdateViewerCount(
-	// 	stream,
-	// 	s.Server.RoomLen(
-	// 		"/",
-	// 		fmt.Sprintf("chatroom_%s", stream.Identifier),
-	// 	),
-	// )
+	conn.Leave(socketRoomName(chatRoom))
 
 	fmt.Println("left stream: ", chatRoom.Identifier, conn.RemoteAddr().String())
 
@@ -184,8 +167,8 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 	}
 
 	// Broadcast the message to the room
-	s.Broadcast(
-		fmt.Sprintf("chatroom_%s", chatRoom.Identifier),
+	go s.Broadcast(
+		socketRoomName(chatRoom),
 		"chat.messages",
 		[]map[string]interface{}{
 			{
@@ -209,18 +192,16 @@ func (s *SocketsService) pushChatMsgToBuffer(streamID uint64, msg *ChatMsg) {
 
 	// Lock on the buffers
 	s.streamChatBuffersMut.Lock()
+	defer s.streamChatBuffersMut.Unlock()
 
 	// Get the buffer for this stream identifier
 	buf, ok := s.streamChatBuffers[streamID]
 	if !ok {
 		buf = &LiveChatMessageBuffer{
-			MaxLength: 10,
+			MaxLength: 25,
 		}
 		s.streamChatBuffers[streamID] = buf
 	}
-
-	// Unlock the buffer mutex since we have a pointer to what we need now
-	s.streamChatBuffersMut.Unlock()
 
 	// Push the message
 	buf.Push(msg)
@@ -230,11 +211,11 @@ func (s *SocketsService) pushChatMsgToBuffer(streamID uint64, msg *ChatMsg) {
 func (s *SocketsService) copyChatMsgBuffer(streamID uint64) []*ChatMsg {
 
 	// Lock on the buffers
-	s.streamChatBuffersMut.Lock()
+	s.streamChatBuffersMut.RLock()
+	defer s.streamChatBuffersMut.RUnlock()
 
 	// Get the buffer for this stream identifier
 	buf, ok := s.streamChatBuffers[streamID]
-	s.streamChatBuffersMut.Unlock()
 	if !ok {
 		return nil
 	}
