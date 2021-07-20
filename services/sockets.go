@@ -78,16 +78,15 @@ func (s *SocketsService) OnChatRoomJoin(conn socketio.Conn, data ChatRoomJoinMsg
 	// Emit all the buffered messages to the new viewer, so they don't open the page to
 	// a completely empty live chat screen
 	bufMsgs := s.copyChatMsgBuffer(chatRoom.ID)
-	for _, msg := range bufMsgs {
-		conn.Emit(
-			"chat.message",
-			map[string]interface{}{
-				"username":  msg.User.Username,
-				"photo_url": msg.User.PhotoUrl,
-				"message":   msg.Message,
-			},
-		)
+	messagesSer := make([]map[string]interface{}, len(bufMsgs))
+	for i, msg := range bufMsgs {
+		messagesSer[i] = map[string]interface{}{
+			"username":  msg.User.Username,
+			"photo_url": msg.User.PhotoUrl,
+			"message":   msg.Message,
+		}
 	}
+	conn.Emit("chat.messages", messagesSer)
 
 	fmt.Println("joined stream: ", chatRoom.Identifier, conn.RemoteAddr().String())
 
@@ -187,11 +186,13 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 	// Broadcast the message to the room
 	s.Broadcast(
 		fmt.Sprintf("chatroom_%s", chatRoom.Identifier),
-		"chat.message",
-		map[string]interface{}{
-			"username":  data.User.Username,
-			"photo_url": data.User.PhotoUrl,
-			"message":   data.Message,
+		"chat.messages",
+		[]map[string]interface{}{
+			{
+				"username":  data.User.Username,
+				"photo_url": data.User.PhotoUrl,
+				"message":   data.Message,
+			},
 		},
 	)
 
