@@ -5,14 +5,9 @@ import "sync"
 type LiveChatMessageBuffer struct {
 	MaxLength int
 	items     []*ChatMsg
-	// mut       sync.RWMutex
 }
 
 func (buf *LiveChatMessageBuffer) Push(msg *ChatMsg) {
-
-	// // Lock on the mutex with write access
-	// buf.mut.Lock()
-	// defer buf.mut.Unlock()
 
 	// If there is still room under the max, add it
 	if len(buf.items) < buf.MaxLength {
@@ -31,10 +26,6 @@ func (buf *LiveChatMessageBuffer) Push(msg *ChatMsg) {
 }
 
 func (buf *LiveChatMessageBuffer) GetCopy() []*ChatMsg {
-
-	// // Lock on the mutex with readonly access
-	// buf.mut.RLock()
-	// defer buf.mut.RUnlock()
 
 	// Create the new slice for elements
 	items := make([]*ChatMsg, len(buf.items))
