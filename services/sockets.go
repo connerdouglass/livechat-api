@@ -3,22 +3,21 @@ package services
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/godocompany/livechat-api/models"
+	"github.com/godocompany/livechat-api/utils"
 	socketio "github.com/googollee/go-socket.io"
 )
 
-type SocketContext struct {
-	User *TelegramUser
+type ChatUser struct {
+	Username string `json:"username"`
+	PhotoUrl string `json:"photo_url"`
 }
 
 type SocketsService struct {
-	Server               *socketio.Server
-	TelegramService      *TelegramService
-	ChatService          *ChatService
-	streamChatBuffers    map[uint64]*LiveChatMessageBuffer
-	streamChatBuffersMut sync.RWMutex
+	Server      *socketio.Server
+	ChatService *ChatService
+	chatBuffers LiveChatBufferGroup
 }
 
 func socketRoomName(chatRoom *models.ChatRoom) string {
@@ -27,13 +26,9 @@ func socketRoomName(chatRoom *models.ChatRoom) string {
 
 func (s *SocketsService) Setup() {
 
-	// Create the buffer
-	s.streamChatBuffers = map[uint64]*LiveChatMessageBuffer{}
-
 	// Add handlers to the socket server
 	s.Server.OnConnect("/", func(conn socketio.Conn) error {
 		fmt.Println("client connected: ", conn.RemoteAddr().String())
-		conn.SetContext(SocketContext{})
 		return nil
 	})
 
@@ -80,7 +75,7 @@ func (s *SocketsService) OnChatRoomJoin(conn socketio.Conn, data ChatRoomJoinMsg
 
 	// Emit all the buffered messages to the new viewer, so they don't open the page to
 	// a completely empty live chat screen
-	bufMsgs := s.copyChatMsgBuffer(chatRoom.ID)
+	bufMsgs := s.chatBuffers.CopyMessages(chatRoom.ID)
 	messagesSer := make([]map[string]interface{}, len(bufMsgs))
 	for i, msg := range bufMsgs {
 		messagesSer[i] = map[string]interface{}{
@@ -132,9 +127,9 @@ func (s *SocketsService) OnChatRoomLeave(conn socketio.Conn, data ChatRoomLeaveM
 //====================================================================================================
 
 type ChatMsg struct {
-	ChatRoomIdentifier string       `json:"chat_room_identifier"`
-	Message            string       `json:"message"`
-	User               TelegramUser `json:"user"`
+	ChatRoomIdentifier string   `json:"chat_room_identifier"`
+	Message            string   `json:"message"`
+	User               ChatUser `json:"user"`
 }
 
 func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) error {
@@ -148,16 +143,13 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 		return errors.New("chat room not found")
 	}
 
-	// Validate the telegram user
-	if !s.TelegramService.Verify(&data.User) {
-		fmt.Println("Verification failed!")
-		// return errors.New("invalid Telegram user hash")
-	}
-
 	// Check if the user is muted in chat
 	muted, err := s.ChatService.IsUserMuted(
 		chatRoom.OrganizationID,
-		data.User.Username,
+		&ChatUserInfo{
+			Username:  data.User.Username,
+			IpAddress: utils.GetIpAddress(conn.RemoteHeader(), conn.RemoteAddr()),
+		},
 	)
 	if err != nil {
 		return err
@@ -182,45 +174,8 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 	// Push the chat message to the buffer
 	// Do it in a goroutine because we don't care about the result and we don't want to block
 	// the socket handler just to do this task
-	go s.pushChatMsgToBuffer(chatRoom.ID, &data)
+	go s.chatBuffers.PushMessage(chatRoom.ID, &data)
 
 	return nil
-
-}
-
-func (s *SocketsService) pushChatMsgToBuffer(streamID uint64, msg *ChatMsg) {
-
-	// Lock on the buffers
-	s.streamChatBuffersMut.Lock()
-	defer s.streamChatBuffersMut.Unlock()
-
-	// Get the buffer for this stream identifier
-	buf, ok := s.streamChatBuffers[streamID]
-	if !ok {
-		buf = &LiveChatMessageBuffer{
-			MaxLength: 25,
-		}
-		s.streamChatBuffers[streamID] = buf
-	}
-
-	// Push the message
-	buf.Push(msg)
-
-}
-
-func (s *SocketsService) copyChatMsgBuffer(streamID uint64) []*ChatMsg {
-
-	// Lock on the buffers
-	s.streamChatBuffersMut.RLock()
-	defer s.streamChatBuffersMut.RUnlock()
-
-	// Get the buffer for this stream identifier
-	buf, ok := s.streamChatBuffers[streamID]
-	if !ok {
-		return nil
-	}
-
-	// Copy the values from the buffer
-	return buf.GetCopy()
 
 }

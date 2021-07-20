@@ -11,7 +11,6 @@ import (
 type Server struct {
 	AccountsService   *services.AccountsService
 	AuthTokensService *services.AuthTokensService
-	TelegramService   *services.TelegramService
 	ChatService       *services.ChatService
 }
 
@@ -33,9 +32,7 @@ func (s *Server) Setup(g *gin.RouterGroup) {
 func (s *Server) setupPublicHooks(g *gin.RouterGroup) {
 
 	// Register public API routes
-	g.POST("/app/get-state", hooks.AppState(
-		s.TelegramService,
-	))
+	g.POST("/app/get-state", hooks.AppState())
 	g.POST("/auth/login", hooks.AuthLogin(
 		s.AccountsService,
 		s.AuthTokensService,

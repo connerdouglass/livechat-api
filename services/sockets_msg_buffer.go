@@ -1,5 +1,7 @@
 package services
 
+import "sync"
+
 type LiveChatMessageBuffer struct {
 	MaxLength int
 	items     []*ChatMsg
@@ -44,5 +46,47 @@ func (buf *LiveChatMessageBuffer) GetCopy() []*ChatMsg {
 
 	// Return the new slice
 	return items
+
+}
+
+type LiveChatBufferGroup struct {
+	streamChatBuffers    map[uint64]*LiveChatMessageBuffer
+	streamChatBuffersMut sync.RWMutex
+}
+
+func (s *LiveChatBufferGroup) PushMessage(streamID uint64, msg *ChatMsg) {
+
+	// Lock on the buffers
+	s.streamChatBuffersMut.Lock()
+	defer s.streamChatBuffersMut.Unlock()
+
+	// Get the buffer for this stream identifier
+	buf, ok := s.streamChatBuffers[streamID]
+	if !ok {
+		buf = &LiveChatMessageBuffer{
+			MaxLength: 25,
+		}
+		s.streamChatBuffers[streamID] = buf
+	}
+
+	// Push the message
+	buf.Push(msg)
+
+}
+
+func (s *LiveChatBufferGroup) CopyMessages(streamID uint64) []*ChatMsg {
+
+	// Lock on the buffers
+	s.streamChatBuffersMut.RLock()
+	defer s.streamChatBuffersMut.RUnlock()
+
+	// Get the buffer for this stream identifier
+	buf, ok := s.streamChatBuffers[streamID]
+	if !ok {
+		return nil
+	}
+
+	// Copy the values from the buffer
+	return buf.GetCopy()
 
 }

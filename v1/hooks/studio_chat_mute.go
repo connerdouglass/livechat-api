@@ -28,11 +28,11 @@ func StudioChatMute(
 		// Get the account sending the request
 		// account := utils.CtxGetAccount(c)
 
-		// Mute the user on the chat
-		if _, err := chatService.MuteUser(req.OrganizationID, req.Username); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+		// // Mute the user on the chat
+		// if _, err := chatService.MuteUser(req.OrganizationID, req.Username); err != nil {
+		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// 	return
+		// }
 
 		// Otherwise return something successfully
 		c.JSON(http.StatusOK, gin.H{

@@ -55,6 +55,7 @@ func main() {
 	db.AutoMigrate(
 		&models.Account{},
 		&models.Badge{},
+		&models.BannedWord{},
 		&models.ChatRoom{},
 		&models.MutedUser{},
 		&models.Organization{},
@@ -84,18 +85,12 @@ func main() {
 	// Create all the service instances
 	//================================================================================
 
-	// Create the rest of the services
-	telegramService := &services.TelegramService{
-		BotAPIKey:   os.Getenv("TELEGRAM_BOT_API_KEY"),
-		BotUsername: os.Getenv("TELEGRAM_BOT_USERNAME"),
-	}
 	chatService := &services.ChatService{
 		DB: db,
 	}
 	socketsService := &services.SocketsService{
-		Server:          socketIoServer,
-		TelegramService: telegramService,
-		ChatService:     chatService,
+		Server:      socketIoServer,
+		ChatService: chatService,
 	}
 	accountsService := &services.AccountsService{DB: db}
 	authTokensService := &services.AuthTokensService{
@@ -125,7 +120,6 @@ func main() {
 	api := &v1.Server{
 		AccountsService:   accountsService,
 		AuthTokensService: authTokensService,
-		TelegramService:   telegramService,
 		ChatService:       chatService,
 	}
 

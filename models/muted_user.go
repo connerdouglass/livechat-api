@@ -10,7 +10,9 @@ type MutedUser struct {
 	ID             uint64 `gorm:"primaryKey"`
 	OrganizationID uint64
 	Organization   *Organization
-	Username       string
+	Username       sql.NullString
+	IpAddress      sql.NullString
+	UntilDate      sql.NullTime
 	CreatedDate    time.Time
 	DeletedDate    sql.NullTime
 }
