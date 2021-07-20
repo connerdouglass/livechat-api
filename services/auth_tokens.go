@@ -16,12 +16,6 @@ type AuthTokensService struct {
 	SigningPepper string
 }
 
-type tokenOwnerDesc struct {
-	Type   string
-	ID     uint64
-	Secret string
-}
-
 // getSigningSecretKey gets the secret key used to sign and verify JWT tokens. The secret key combines
 // the account's salt, the platform's salt, as well as the signing pepper for this server overall.
 // Changes to any of those three values will result in possibly many tokens becoming invalid.
