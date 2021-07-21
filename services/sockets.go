@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/godocompany/livechat-api/models"
 	"github.com/godocompany/livechat-api/utils"
@@ -143,19 +144,51 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 		return errors.New("chat room not found")
 	}
 
-	// Check if the user is muted in chat
-	muted, err := s.ChatService.IsUserMuted(
-		chatRoom.OrganizationID,
-		&ChatUserInfo{
-			Username:  data.User.Username,
-			IpAddress: utils.GetIpAddress(conn.RemoteHeader(), conn.RemoteAddr()),
-		},
+	// Wrap the chat user info
+	chatUserInfo := ChatUserInfo{
+		Username:  data.User.Username,
+		IpAddress: utils.GetIpAddress(conn.RemoteHeader(), conn.RemoteAddr()),
+	}
+
+	// Check if we can send the message
+	canSend, bannedWord, err := s.ChatService.CanSendMessage(
+		chatRoom,
+		&chatUserInfo,
+		data.Message,
 	)
 	if err != nil {
 		return err
 	}
-	if muted {
-		return errors.New("user is muted in chat")
+	if !canSend {
+
+		// If we ran afoul of a banned word
+		if bannedWord != nil {
+
+			// The date to ban until
+			var ban bool
+			var banUntil *time.Time
+
+			// If there is a permanent ban
+			if bannedWord.PermanentBan {
+				ban = true
+			} else if bannedWord.TemporaryMuteSeconds.Valid {
+				ban = true
+				until := time.Now().Add(time.Second * time.Duration(bannedWord.TemporaryMuteSeconds.Int64))
+				banUntil = &until
+			}
+
+			// If we're banning the user, initiate the ban
+			if ban {
+				if _, err := s.ChatService.MuteUser(chatRoom.OrganizationID, &chatUserInfo, banUntil); err != nil {
+					fmt.Println("Error muting user: ", err.Error())
+				}
+			}
+
+		}
+
+		// Return here to prevent sending the message
+		return nil
+
 	}
 
 	// Broadcast the message to the room

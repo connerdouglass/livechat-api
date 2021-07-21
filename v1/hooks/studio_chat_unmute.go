@@ -8,8 +8,8 @@ import (
 )
 
 type StudioChatUnmuteReq struct {
-	OrganizationID uint64 `json:"organization_id"`
-	Username       string `json:"username"`
+	OrganizationID uint64                `json:"organization_id"`
+	User           services.ChatUserInfo `json:"user"`
 }
 
 func StudioChatUnmute(
@@ -29,7 +29,7 @@ func StudioChatUnmute(
 		// account := utils.CtxGetAccount(c)
 
 		// Mute the user on the chat
-		if err := chatService.UnmuteUser(req.OrganizationID, req.Username); err != nil {
+		if err := chatService.UnmuteUser(req.OrganizationID, &req.User); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

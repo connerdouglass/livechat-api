@@ -9,6 +9,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type ChatUserInfo struct {
+	Username  string `json:"username"`
+	IpAddress string `json:"ip_address"`
+}
+
 // ChatService manages chat moderation
 type ChatService struct {
 	DB *gorm.DB
@@ -33,10 +38,14 @@ func (s *ChatService) GetChatRoomByIdentifier(identifier string) (*models.ChatRo
 
 func (s *ChatService) MuteUser(
 	organizationID uint64,
-	username string,
-	ipAddress string,
+	user *ChatUserInfo,
 	untilDate *time.Time,
 ) (*models.MutedUser, error) {
+
+	// If the user info is missing both fields
+	if len(user.Username) == 0 && len(user.IpAddress) == 0 {
+		return nil, nil
+	}
 
 	// Create the until date
 	var until sql.NullTime
@@ -53,16 +62,16 @@ func (s *ChatService) MuteUser(
 		UntilDate:      until,
 		CreatedDate:    time.Now(),
 	}
-	if len(username) > 0 {
+	if len(user.Username) > 0 {
 		mutedUser.Username = sql.NullString{
 			Valid:  true,
-			String: username,
+			String: user.Username,
 		}
 	}
-	if len(ipAddress) > 0 {
+	if len(user.IpAddress) > 0 {
 		mutedUser.IpAddress = sql.NullString{
 			Valid:  true,
-			String: ipAddress,
+			String: user.IpAddress,
 		}
 	}
 	if err := s.DB.Create(&mutedUser).Error; err != nil {
@@ -74,15 +83,37 @@ func (s *ChatService) MuteUser(
 
 func (s *ChatService) UnmuteUser(
 	organizationID uint64,
-	username string,
+	user *ChatUserInfo,
 ) error {
-	return s.DB.
+
+	// If the user info is missing both fields
+	if len(user.Username) == 0 && len(user.IpAddress) == 0 {
+		return nil
+	}
+
+	// Construct the query
+	query := s.DB.
 		Model(&models.MutedUser{}).
 		Where("deleted_date IS NULL").
-		Where("organization_id = ?", organizationID).
-		Where("username LIKE ?", username).
+		Where("organization_id = ?", organizationID)
+
+	// Create the ors
+	ors := s.DB
+
+	// Add the username and/or IP address
+	if len(user.Username) > 0 {
+		ors = ors.Or("username LIKE ?", user.Username)
+	}
+	if len(user.IpAddress) > 0 {
+		ors = ors.Or("ip_address LIKE ?", user.IpAddress)
+	}
+
+	// Update all of the muted users and mark as deleted
+	return query.
+		Where(ors).
 		Update("deleted_date", time.Now()).
 		Error
+
 }
 
 func (s *ChatService) IsUserMuted(
@@ -101,7 +132,7 @@ func (s *ChatService) IsUserMuted(
 		Where("until_date IS NULL OR until_date < ?", time.Now()).
 		Where("organization_id = ?", organizationID)
 
-	//
+	// Add the username and/or IP address
 	if len(user.Username) > 0 {
 		query = query.Where("username LIKE ?", user.Username)
 	}
@@ -135,12 +166,8 @@ func (s *ChatService) GetBannedWords(organizationID uint64) ([]*models.BannedWor
 }
 
 func (s *ChatService) checkMessageAgainstBannedWord(message string, bw *models.BannedWord) bool {
-	return true
-}
 
-type ChatUserInfo struct {
-	Username  string
-	IpAddress string
+	return true
 }
 
 // CanSendMessage determines if a given message can be sent from a user to a chatroom
@@ -148,24 +175,31 @@ func (s *ChatService) CanSendMessage(
 	chatRoom *models.ChatRoom,
 	user *ChatUserInfo,
 	message string,
-) (bool, error) {
+) (bool, *models.BannedWord, error) {
 
 	// Check if the user is banned
+	muted, err := s.IsUserMuted(chatRoom.OrganizationID, user)
+	if err != nil {
+		return false, nil, err
+	}
+	if muted {
+		return false, nil, nil
+	}
 
 	// Check for all the banned words
 	bannedWords, err := s.GetBannedWords(chatRoom.OrganizationID)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	// Loop through the banned words
 	for _, bw := range bannedWords {
 		if !s.checkMessageAgainstBannedWord(message, bw) {
-			return false, nil
+			return false, bw, nil
 		}
 	}
 
 	// The message looks good
-	return true, nil
+	return true, nil, nil
 
 }
