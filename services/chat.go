@@ -3,6 +3,8 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/godocompany/livechat-api/models"
@@ -165,9 +167,26 @@ func (s *ChatService) GetBannedWords(organizationID uint64) ([]*models.BannedWor
 	return bannedWords, nil
 }
 
-func (s *ChatService) checkMessageAgainstBannedWord(message string, bw *models.BannedWord) bool {
+// messageContainsBannedWord checks if a message contains a banned word
+func (s *ChatService) messageContainsBannedWord(message string, word string) bool {
 
-	return true
+	// Do a simple check for the strings
+	if strings.Contains(strings.ToLower(message), strings.ToLower(word)) {
+		return true
+	}
+
+	simplifyStr := func(s string) string {
+		return strings.ToLower(regexp.MustCompile(`\W`).ReplaceAllString(s, ""))
+	}
+
+	// Do a comparison between simplified versions of both strings
+	if strings.Contains(simplifyStr(message), simplifyStr(word)) {
+		return true
+	}
+
+	// Return false if we get here
+	return false
+
 }
 
 // CanSendMessage determines if a given message can be sent from a user to a chatroom
@@ -194,7 +213,7 @@ func (s *ChatService) CanSendMessage(
 
 	// Loop through the banned words
 	for _, bw := range bannedWords {
-		if !s.checkMessageAgainstBannedWord(message, bw) {
+		if s.messageContainsBannedWord(message, bw.Word) {
 			return false, bw, nil
 		}
 	}
