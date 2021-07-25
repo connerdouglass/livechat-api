@@ -25,6 +25,10 @@ func socketRoomName(chatRoom *models.ChatRoom) string {
 	return fmt.Sprintf("chatroom_%s", chatRoom.Identifier)
 }
 
+func calculateMessageID(msg *ChatMsg) string {
+	return utils.Sha256Hex(fmt.Sprintf("%s.%s", msg.User.Username, msg.Message))
+}
+
 func (s *SocketsService) Setup() {
 
 	// Add handlers to the socket server
@@ -43,6 +47,7 @@ func (s *SocketsService) Setup() {
 	s.Server.OnEvent("/", "chatroom.join", s.OnChatRoomJoin)
 	s.Server.OnEvent("/", "chatroom.leave", s.OnChatRoomLeave)
 	s.Server.OnEvent("/", "chatroom.message", s.OnChatRoomMessage)
+	s.Server.OnEvent("/", "chatroom.revoke-message", s.OnChatRoomRevokeMessage)
 
 }
 
@@ -80,9 +85,10 @@ func (s *SocketsService) OnChatRoomJoin(conn socketio.Conn, data ChatRoomJoinMsg
 	messagesSer := make([]map[string]interface{}, len(bufMsgs))
 	for i, msg := range bufMsgs {
 		messagesSer[i] = map[string]interface{}{
-			"username":  msg.User.Username,
-			"photo_url": msg.User.PhotoUrl,
-			"message":   msg.Message,
+			"id":        msg.ID,
+			"username":  msg.Message.User.Username,
+			"photo_url": msg.Message.User.PhotoUrl,
+			"message":   msg.Message.Message,
 		}
 	}
 	conn.Emit("chat.messages", messagesSer)
@@ -191,12 +197,16 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 
 	}
 
+	// Calculate the message identifier
+	msgID := calculateMessageID(&data)
+
 	// Broadcast the message to the room
 	go s.Broadcast(
 		socketRoomName(chatRoom),
 		"chat.messages",
 		[]map[string]interface{}{
 			{
+				"id":        msgID,
 				"username":  data.User.Username,
 				"photo_url": data.User.PhotoUrl,
 				"message":   data.Message,
@@ -207,8 +217,46 @@ func (s *SocketsService) OnChatRoomMessage(conn socketio.Conn, data ChatMsg) err
 	// Push the chat message to the buffer
 	// Do it in a goroutine because we don't care about the result and we don't want to block
 	// the socket handler just to do this task
-	go s.chatBuffers.PushMessage(chatRoom.ID, &data)
+	go s.chatBuffers.PushMessage(chatRoom.ID, msgID, &data)
 
+	return nil
+
+}
+
+//====================================================================================================
+// chatroom.revoke-message event handler
+// Called when a viewer revokes a message from the chat
+//====================================================================================================
+
+type ChatRevokeMsg struct {
+	ChatRoomIdentifier string `json:"chat_room_identifier"`
+	MessageID          string `json:"message_id"`
+}
+
+func (s *SocketsService) OnChatRoomRevokeMessage(conn socketio.Conn, data ChatRevokeMsg) error {
+
+	// Get the stream with the identifier
+	chatRoom, err := s.ChatService.GetChatRoomByIdentifier(data.ChatRoomIdentifier)
+	if err != nil {
+		return err
+	}
+	if chatRoom == nil {
+		return errors.New("chat room not found")
+	}
+
+	// Broadcast the deletion of the message to the room
+	go s.Broadcast(
+		socketRoomName(chatRoom),
+		"chat.revoke-message",
+		map[string]interface{}{
+			"id": data.MessageID,
+		},
+	)
+
+	// Revoke the message from the buffer
+	go s.chatBuffers.RevokeMessage(chatRoom.ID, data.MessageID)
+
+	// Return without error
 	return nil
 
 }
