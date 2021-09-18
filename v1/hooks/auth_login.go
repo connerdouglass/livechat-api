@@ -3,8 +3,8 @@ package hooks
 import (
 	"net/http"
 
+	"github.com/connerdouglass/livechat-api/services"
 	"github.com/gin-gonic/gin"
-	"github.com/godocompany/livechat-api/services"
 )
 
 type AuthLoginReq struct {

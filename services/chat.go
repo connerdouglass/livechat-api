@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/godocompany/livechat-api/models"
+	"github.com/connerdouglass/livechat-api/models"
 	"gorm.io/gorm"
 )
 

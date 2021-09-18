@@ -1,10 +1,10 @@
 package v1
 
 import (
+	"github.com/connerdouglass/livechat-api/services"
+	"github.com/connerdouglass/livechat-api/v1/hooks"
+	"github.com/connerdouglass/livechat-api/v1/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/godocompany/livechat-api/services"
-	"github.com/godocompany/livechat-api/v1/hooks"
-	"github.com/godocompany/livechat-api/v1/middleware"
 )
 
 // Server is the API server instance

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/godocompany/livechat-api/utils"
+	"github.com/connerdouglass/livechat-api/utils"
 )
 
 // Account is an admin account on the platform

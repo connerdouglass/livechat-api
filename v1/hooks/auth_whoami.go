@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/connerdouglass/livechat-api/models"
+	"github.com/connerdouglass/livechat-api/services"
+	"github.com/connerdouglass/livechat-api/v1/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/godocompany/livechat-api/models"
-	"github.com/godocompany/livechat-api/services"
-	"github.com/godocompany/livechat-api/v1/utils"
 )
 
 func AuthWhoAmI(

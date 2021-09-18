@@ -1,8 +1,8 @@
 package utils
 
 import (
+	"github.com/connerdouglass/livechat-api/models"
 	"github.com/gin-gonic/gin"
-	"github.com/godocompany/livechat-api/models"
 )
 
 // CtxGetAccount gets the account (or nil) from a Gin context

@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/connerdouglass/livechat-api/v1/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/godocompany/livechat-api/v1/utils"
 )
 
 // RequireLogin creates a middleware function to require authentication on a hook

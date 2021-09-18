@@ -3,7 +3,7 @@ package services
 import (
 	"errors"
 
-	"github.com/godocompany/livechat-api/models"
+	"github.com/connerdouglass/livechat-api/models"
 	"gorm.io/gorm"
 )
 

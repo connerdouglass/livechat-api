@@ -1,4 +1,4 @@
-module github.com/godocompany/livechat-api
+module github.com/connerdouglass/livechat-api
 
 go 1.16
 

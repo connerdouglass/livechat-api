@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/godocompany/livechat-api/models"
-	"github.com/godocompany/livechat-api/utils"
+	"github.com/connerdouglass/livechat-api/models"
+	"github.com/connerdouglass/livechat-api/utils"
 	socketio "github.com/googollee/go-socket.io"
 )
 

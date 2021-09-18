@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/connerdouglass/livechat-api/models"
+	"github.com/connerdouglass/livechat-api/utils"
 	"github.com/dgrijalva/jwt-go/v4"
-	"github.com/godocompany/livechat-api/models"
-	"github.com/godocompany/livechat-api/utils"
 	"gorm.io/gorm"
 )
 
